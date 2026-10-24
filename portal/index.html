@@ -109,6 +109,22 @@ nav.tabs.owner .tab{font-size:.6875rem}
 .search input{flex:1;min-width:0}
 .ftype{font-size:.6875rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
 .lib-hint{font-size:.8125rem;color:var(--muted)}
+.lessonpage h1{font-size:1.625rem}
+.md{max-width:68ch;font-size:1rem;line-height:1.65;overflow-wrap:anywhere;min-width:0}
+.md>*+*{margin-top:12px}
+.md p{margin:0}
+.md h1,.md h2{font-size:1.25rem;margin-top:24px}
+.md h3{font-size:1.125rem;margin-top:24px}
+.md h4,.md h5{font-size:1rem;margin-top:20px}
+.md ul,.md ol{margin:0;padding-left:1.4em}
+.md li+li{margin-top:4px}
+.md a{color:var(--accent);text-underline-offset:2px}
+.md img{max-width:100%;height:auto;border-radius:8px}
+.md hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+.md blockquote{margin:0;padding:8px 14px;border-left:3px solid var(--line);color:var(--muted)}
+.md table{display:block;overflow-x:auto;border-collapse:collapse;font-size:.875rem}
+.md th,.md td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+.md code{font-size:.875em;background:var(--soft);padding:1px 5px;border-radius:5px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -136,6 +152,9 @@ nav.tabs.owner .tab{font-size:.6875rem}
   </div>
 </nav>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 (function(){
 const KINDS={watch:"Watch",do:"Do",discuss:"Discuss",attend:"Attend",read:"Read"};
@@ -184,16 +203,20 @@ function toggleDone(id){
 
 /* ---------- library (owner only, reads Google Drive live) ---------- */
 const DRIVE="Google Drive";
-const LIB={mcp:null,ready:false,rootId:null,rootTitle:"Library",path:[],cache:{},loading:null,err:null,q:"",results:null,done:{},last:null};
+const LIB={mcp:null,ready:false,rootId:null,rootTitle:"Library",path:[],cache:{},meta:{},loading:null,err:null,q:"",results:null,done:{},last:null,view:null,docs:{},docBusy:{},docErr:{}};
 const FOLDER="application/vnd.google-apps.folder";
+const CACHE={cache:{staleTime:300000,gcTime:86400000}};
 function curFolder(){return LIB.path.length?LIB.path[LIB.path.length-1].id:LIB.rootId;}
+function curTitle(){return LIB.path.length?LIB.path[LIB.path.length-1].title:LIB.rootTitle;}
 function natural(a,b){return String(a.title).localeCompare(String(b.title),undefined,{numeric:true,sensitivity:"base"});}
+function isGdoc(f){return (f.mimeType||"")==="application/vnd.google-apps.document";}
+function isDocx(f){return /wordprocessingml/.test(f.mimeType||"");}
+function readable(f){return isGdoc(f)||isDocx(f);}
 function kindOf(f){const m=f.mimeType||"",t=f.title||"";
   if(m===FOLDER) return "folder";
   if(m.startsWith("video/")||/\.(mkv|mp4|webm|mov|m4v)$/i.test(t)) return "video";
-  if(/^lesson pages/i.test(t)) return "lesson";
-  if(/^quizzes/i.test(t)) return "quiz";
-  if(/^video recordings/i.test(t)) return "videolinks";
+  if(/^lesson pages/i.test(t)&&readable(f)) return "lesson";
+  if(readable(f)) return "read";
   return "file";}
 function typeLabel(f){const m=f.mimeType||"";
   if(m.endsWith(".document")) return "Doc"; if(m.endsWith(".presentation")) return "Slides"; if(m.endsWith(".spreadsheet")) return "Sheet";
@@ -206,45 +229,192 @@ function libErrText(e){const c=e&&e.code;
   if(c==="not_in_manifest"||c==="approval_required"||c==="consent_required") return {msg:"This page needs your permission to read Google Drive.",ask:true};
   if(c==="blocked_by_policy") return {msg:"Your organisation's settings block Google Drive here.",ask:false};
   if(c==="server_unavailable"||c==="rate_limited") return {msg:"Google Drive didn't answer in time.",ask:true};
-  if(c==="tool_error") return {msg:"Google Drive refused the request: "+(e.message||"unknown error"),ask:true};
-  return {msg:"Couldn't load this folder from Google Drive.",ask:true};}
+  if(c==="tool_error") return {msg:"Google Drive refused the request: "+String(e.message||"unknown error").slice(0,200),ask:true};
+  if(c==="parse") return {msg:"This document couldn't be read: "+(e.message||""),ask:true};
+  return {msg:"Couldn't load this from Google Drive.",ask:true};}
+async function withRetry(fn){
+  try{return await fn();}
+  catch(e){ if(e&&e.retryable){await new Promise(r=>setTimeout(r,Math.min(e.retryAfterMs||(800+Math.random()*700),5000)));return await fn();} throw e;}
+}
 async function driveSearch(query,refresh){
-  const opts={cache:{staleTime:300000,gcTime:86400000}}; if(refresh) opts.cache.refresh=true;
-  let files=[],tok=null,retried=false;
+  const opts={cache:Object.assign({},CACHE.cache)}; if(refresh) opts.cache.refresh=true;
+  let files=[],tok=null;
   for(let i=0;i<20;i++){
     const input={query,pageSize:100,excludeContentSnippets:true}; if(tok) input.pageToken=tok;
-    let r;
-    try{r=await LIB.mcp.callTool(DRIVE,"search_files",input,opts);}
-    catch(e){ if(e&&e.retryable&&!retried){retried=true;await new Promise(res=>setTimeout(res,Math.min(e.retryAfterMs||800+Math.random()*700,5000)));i--;continue;} throw e;}
+    const r=await withRetry(()=>LIB.mcp.callTool(DRIVE,"search_files",input,opts));
     const p=(r&&r.payload)||{}; const page=Array.isArray(p.files)?p.files:[];
     files=files.concat(page); tok=p.nextPageToken;
     if(!tok||!page.length) break;
   }
-  const seen=new Set(); return files.filter(f=>f&&f.id&&!seen.has(f.id)&&seen.add(f.id));
+  const seen=new Set(); const out=files.filter(f=>f&&f.id&&!seen.has(f.id)&&seen.add(f.id));
+  out.forEach(f=>LIB.meta[f.id]=f); return out;
 }
 async function loadFolder(id,refresh){
   if(!LIB.mcp||!id) return;
   if(LIB.cache[id]&&!refresh) return;
   LIB.loading=id; LIB.err=null; render();
-  try{LIB.cache[id]=await driveSearch(`parentId = '${id.replace(/'/g,"")}'`,refresh);}
+  try{LIB.cache[id]=await driveSearch(`parentId = '${id.replace(/'/g,"")}'`,refresh);
+    if(refresh){LIB.cache[id].filter(f=>kindOf(f)==="lesson").forEach(f=>{delete LIB.docs[f.id];});}}
   catch(e){LIB.err=e;}
   if(LIB.loading===id) LIB.loading=null; render();
 }
 async function runSearch(q){
-  q=q.trim(); LIB.q=q; if(!q){LIB.results=null;render();return;}
+  q=q.trim(); LIB.q=q; LIB.view=null; if(!q){LIB.results=null;render();return;}
   LIB.loading="search"; LIB.err=null; render();
   try{LIB.results=await driveSearch(`title contains '${q.replace(/\\/g,"").replace(/'/g,"\\'")}'`);}
   catch(e){LIB.err=e;}
   LIB.loading=null; render();
 }
-function openFolder(id,title){LIB.path.push({id,title});LIB.results=null;LIB.q="";LIB.last={id,title,path:LIB.path.slice(0,6)};saveProgress();loadFolder(id);render();window.scrollTo(0,0);}
-function libItem(f,showType){
-  const on=!!LIB.done[f.id]; const url=safeUrl(f.viewUrl);
+
+/* --- reading lesson docs --- */
+function b64bytes(b64){const s=atob(b64);const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u;}
+function mdEsc(s){return s.replace(/([\\`*_\[\]<])/g,"\\$1");}
+async function docxToMd(bytes){
+  if(!window.JSZip) throw {code:"parse",message:"the Word reader didn't load. Reload the page."};
+  const z=await JSZip.loadAsync(bytes);
+  const xf=z.file("word/document.xml"); if(!xf) throw {code:"parse",message:"not a Word document."};
+  const rels={}; const rf=z.file("word/_rels/document.xml.rels");
+  if(rf){const r=new DOMParser().parseFromString(await rf.async("string"),"application/xml");
+    for(const el of Array.from(r.getElementsByTagName("Relationship"))) rels[el.getAttribute("Id")]=el.getAttribute("Target");}
+  const doc=new DOMParser().parseFromString(await xf.async("string"),"application/xml");
+  const runText=node=>{let s="";for(const t of Array.from(node.getElementsByTagName("*"))){const n=t.localName;if(n==="t")s+=t.textContent;else if(n==="tab")s+=" ";else if(n==="br")s+="\n";}return s;};
+  const out=[];
+  for(const p of Array.from(doc.getElementsByTagName("w:p"))){
+    const ps=p.getElementsByTagName("w:pStyle")[0]; const style=ps?ps.getAttribute("w:val")||"":"";
+    let text="";
+    for(const ch of Array.from(p.childNodes)){
+      if(ch.nodeType!==1) continue;
+      if(ch.localName==="r") text+=mdEsc(runText(ch));
+      else if(ch.localName==="hyperlink"){const t=runText(ch).trim();const url=rels[ch.getAttribute("r:id")]||"";
+        text+=url&&/^https?:/.test(url)?"["+mdEsc(t||url)+"]("+url.replace(/[()\s]/g,c=>encodeURIComponent(c))+")":mdEsc(t);}
+    }
+    text=text.replace(/\n/g,"  \n");
+    let k="p";
+    if(style==="Title") k="title";
+    else if(/^Heading1$/.test(style)) {k="h";text="# "+text;}
+    else if(/^Heading2$/.test(style)) {k="h";text="## "+text;}
+    else if(/^Heading3$/.test(style)) {k="h";text="### "+text;}
+    else if(/^Heading[4-9]$/.test(style)) {k="h";text="#### "+text;}
+    else if(/ListNumber/.test(style)) {k="li";text="1. "+text;}
+    else if(/List/.test(style)||p.getElementsByTagName("w:numPr").length) {k="li";text="- "+text;}
+    if(k==="title") continue;
+    out.push({k,text});
+  }
+  let md="";
+  out.forEach((o,i)=>{const prev=out[i-1]; md+=(i===0?"":(o.k==="li"&&prev&&prev.k==="li"?"\n":"\n\n"))+o.text;});
+  return md;
+}
+function unesc(s){return String(s).replace(/\\([\\`*_{}\[\]()#+\-.!:&|~<>=])/g,"$1").replace(/[*_]{1,2}/g,"").trim();}
+function firstUrl(l){const m=l.match(/\]\((https?:\/\/[^)\s]+)\)/)||l.match(/(https?:\\?\/\/[^\s)\]]+)/);return m?m[1].replace(/\\/g,""):"";}
+function parseUnits(md,docx,docTitle){
+  const lines=md.replace(/\r/g,"").split("\n");
+  const count=n=>lines.filter(l=>l.startsWith("#".repeat(n)+" ")).length;
+  let unit=0,sec=0;
+  if(docx){unit=count(2)?2:(count(1)?1:0);sec=unit===2?1:0;}
+  else if(/\*Lesson page:\*/.test(md)){unit=1;}
+  else if(count(1)>=2){unit=1;} else if(count(2)>=2){unit=2;sec=count(1)?1:0;}
+  if(!unit) return [{section:"",title:docTitle,src:"",md:md}];
+  const units=[];let cur=null,section="";
+  for(const l of lines){
+    if(sec&&l.startsWith("#".repeat(sec)+" ")&&!l.startsWith("#".repeat(sec+1))){section=unesc(l.slice(sec+1));cur=null;continue;}
+    if(l.startsWith("#".repeat(unit)+" ")&&!l.startsWith("#".repeat(unit+1))){cur={section,title:unesc(l.slice(unit+1)),src:"",lines:[]};units.push(cur);continue;}
+    if(cur) cur.lines.push(l);
+  }
+  const res=[];
+  units.forEach(u=>{
+    if(/^contents$/i.test(u.title)) return;
+    if(!u.src) u.src="";
+    const keep=[];
+    u.lines.forEach(l=>{
+      const t=l.trim();
+      let m;
+      if((m=t.match(/^\*HelloPM section:\*\s*(.*)$/))){u.section=unesc(m[1]);return;}
+      if(/^\*Lesson page:\*/.test(t)||/^\[?Source:/.test(t)){u.src=firstUrl(t);return;}
+      if(/^\[?(Next|Previous) Lesson\]?(\(.*\))?$/i.test(t)) return;
+      keep.push(l);
+    });
+    while(keep.length&&/^\s*(---)?\s*$/.test(keep[keep.length-1])) keep.pop();
+    while(keep.length&&/^\s*$/.test(keep[0])) keep.shift();
+    if(keep.length&&/^#{1,6} /.test(keep[0])){const h=unesc(keep[0].replace(/^#+ /,""));const norm=x=>x.replace(/[^\p{L}\p{N}]+/gu,"").toLowerCase();if(norm(h)===norm(u.title)){keep.shift();while(keep.length&&/^\s*$/.test(keep[0])) keep.shift();}}
+    const body=keep.join("\n");
+    if(!body.trim()&&!u.src) return;
+    if(docTitle&&u.title===docTitle&&!u.src) return;
+    res.push({section:u.section,title:u.title,src:u.src,md:body});
+  });
+  const withSrc=res.filter(u=>u.src);
+  const fin=withSrc.length?withSrc:res;
+  return fin.length?fin:[{section:"",title:docTitle,src:"",md:md}];
+}
+function mediaOf(u){
+  if(u.media) return u.media;
+  const urls=[];const re=/https?:\/\/[^\s)\]>"']+/g;let m;
+  while((m=re.exec(u.md.replace(/\\/g,"")))) urls.push(m[0].replace(/[.,;]+$/,""));
+  const uniq=a=>[...new Set(a)];
+  const rec=uniq(urls.filter(x=>/youtube\.com\/(watch|live|embed)|youtu\.be\//.test(x)));
+  const slides=uniq(urls.filter(x=>/docs\.google\.com\/presentation\/d\/(?!e\/)/.test(x)));
+  return u.media={rec,slides};
+}
+async function loadDoc(id){
+  const f=LIB.meta[id]; if(!f||LIB.docs[id]||LIB.docBusy[id]) return;
+  LIB.docBusy[id]=true; delete LIB.docErr[id]; render();
+  try{
+    const input={fileId:id}; if(isGdoc(f)) input.exportMimeType="text/markdown";
+    const r=await withRetry(()=>LIB.mcp.callTool(DRIVE,"download_file_content",input,CACHE));
+    const p=(r&&r.payload)||{}; const b64=typeof p.content==="string"?p.content:"";
+    if(!b64) throw {code:"parse",message:"Drive sent back an empty file."};
+    const bytes=b64bytes(b64.replace(/\s/g,""));
+    const md=isDocx(f)?await docxToMd(bytes):new TextDecoder("utf-8").decode(bytes);
+    const title=String(f.title||"").replace(/\.docx$/i,"");
+    const units=parseUnits(md,isDocx(f),title).map((u,i)=>Object.assign(u,{key:id+"#"+i,doc:id,i}));
+    LIB.docs[id]={units};
+  }catch(e){LIB.docErr[id]=e&&e.code?e:{code:"parse",message:String(e&&e.message||e)};}
+  delete LIB.docBusy[id]; render();
+}
+function lessonDocs(fid){return (LIB.cache[fid]||[]).filter(f=>kindOf(f)==="lesson").sort(natural);}
+function lessonsIn(fid){
+  const ds=lessonDocs(fid); if(!ds.length) return {list:[],busy:false,errs:[]};
+  let list=[],busy=false,errs=[];
+  ds.forEach(d=>{ if(LIB.docs[d.id]) list=list.concat(LIB.docs[d.id].units);
+    else if(LIB.docErr[d.id]) errs.push(d); else {busy=true; if(!LIB.docBusy[d.id]) setTimeout(()=>loadDoc(d.id),0);} });
+  return {list,busy,errs};
+}
+function readList(v){
+  if(v.src==="doc"){ if(LIB.docs[v.key]) return {list:LIB.docs[v.key].units,busy:false,errs:[]};
+    if(LIB.docErr[v.key]) return {list:[],busy:false,errs:[LIB.meta[v.key]||{id:v.key,title:"Document"}]};
+    if(!LIB.docBusy[v.key]) setTimeout(()=>loadDoc(v.key),0); return {list:[],busy:true,errs:[]}; }
+  return lessonsIn(v.key);
+}
+function mdHtml(u){
+  if(u.html!=null) return u.html;
+  let h;
+  if(window.marked&&window.DOMPurify){
+    h=DOMPurify.sanitize(marked.parse(u.md,{gfm:true,breaks:false}),{FORBID_TAGS:["style","form","input","iframe"],FORBID_ATTR:["style"]});
+  } else h="<p>"+esc(unesc(u.md)).replace(/\n\n+/g,"</p><p>").replace(/\n/g,"<br>")+"</p>";
+  return u.html=h;
+}
+function fixLinks(){
+  document.querySelectorAll(".md a").forEach(a=>{const href=a.getAttribute("href")||"";
+    if(/^https?:/i.test(href)){a.target="_blank";a.rel="noopener";} else {a.removeAttribute("href");}});
+}
+function openFolder(id,title){LIB.path.push({id,title});LIB.view=null;LIB.results=null;LIB.q="";LIB.last={title,path:LIB.path.slice(-6),view:null};saveProgress();loadFolder(id);render();window.scrollTo(0,0);}
+function openRead(src,key,i){
+  LIB.view={t:"read",src,key,i:+i||0};
+  const L=readList(LIB.view).list; const u=L[LIB.view.i];
+  LIB.last={title:u?u.title:curTitle(),path:LIB.path.slice(-6),view:LIB.view};saveProgress();
+  render();window.scrollTo(0,0);
+}
+
+/* --- library views --- */
+function libFileItem(f){
+  const on=!!LIB.done[f.id]; const url=safeUrl(f.viewUrl); const k=kindOf(f);
   return `<li class="lesson ${on?"is-done":""}">
     <button class="check ${on?"on":""}" data-act="libToggle" data-id="${esc(f.id)}" aria-pressed="${on}" aria-label="${on?"Mark not done":"Mark done"}: ${esc(f.title)}">${on?tick:""}</button>
     <div class="body"><div class="title">${esc(f.title)}</div>
       <div class="meta"><span class="ftype">${esc(typeLabel(f))}</span>${f.modifiedTime?`<span>Updated ${esc(new Date(f.modifiedTime).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}))}</span>`:""}</div>
-      ${url?`<div class="row" style="margin-top:8px"><a class="btn sm quiet" href="${esc(url)}" target="_blank" rel="noopener">${kindOf(f)==="video"?"Play in Drive":"Open"}</a></div>`:""}
+      <div class="row" style="margin-top:8px">
+        ${k==="read"||k==="lesson"?`<button class="btn sm" data-act="libReadDoc" data-id="${esc(f.id)}">Read here</button>`:""}
+        ${url?`<a class="btn sm quiet" href="${esc(url)}" target="_blank" rel="noopener">${k==="video"?"Play in Drive":"Open in Drive"}</a>`:""}
+      </div>
     </div></li>`;
 }
 function folderRow(f){
@@ -253,36 +423,86 @@ function folderRow(f){
     <span class="wnum">${m?esc(m[1]):'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>'}</span>
     <span class="body"><span style="display:block;font-weight:600">${esc(m?m[2]:f.title)}</span></span>${chev}</button></li>`;
 }
+function lessonRows(L,fid){
+  let out="",last=null,n=0;
+  L.forEach((u,idx)=>{
+    if(u.section!==last){ if(last!==null) out+="</ul>"; out+=`<p class="eyebrow phase">${esc(u.section||"Lessons")}</p><ul class="weeks">`; last=u.section; }
+    n++; const on=!!LIB.done[u.key]; const md=mediaOf(u);
+    out+=`<li><button class="weekrow ${on?"complete":""}" data-act="libLesson" data-src="folder" data-key="${esc(fid)}" data-i="${idx}">
+      <span class="wnum">${on?tick:n}</span>
+      <span class="body"><span style="display:block;font-weight:600">${esc(u.title)}</span>
+      <span class="small muted">${md.rec.length?"Recording"+(md.rec.length>1?"s":"")+" · ":""}${md.slides.length?"Slides · ":""}${on?"Done":"Not started"}</span></span>${chev}</button></li>`;
+  });
+  return out+(last!==null?"</ul>":"");
+}
+function libHead(){
+  const crumbs=[`<button data-act="libCrumb" data-i="-1">${esc(LIB.rootTitle)}</button>`].concat(LIB.path.map((p,i)=>`<button data-act="libCrumb" data-i="${i}">${esc(p.title)}</button>`));
+  return `<div class="stack">
+    <p class="eyebrow">Private library · only you can see this</p>
+    <form class="search" id="libSearch" role="search"><input id="lib-q" name="q" type="search" placeholder="Search your Drive by title" value="${esc(LIB.q)}" aria-label="Search your Drive"><button class="btn" type="submit">Search</button></form>
+    ${LIB.results?"":`<nav class="crumbs" aria-label="Folder path">${crumbs.join('<span class="sep">/</span>')}</nav>`}
+  </div>`;
+}
+function renderRead(){
+  const v=LIB.view; const R=readList(v);
+  const backLabel=v.src==="doc"&&LIB.meta[v.key]?curTitle():curTitle();
+  const back=`<div><button class="btn sm ghost" data-act="libBack">← ${esc(backLabel)}</button></div>`;
+  if(R.errs.length){const t=libErrText(LIB.docErr[R.errs[0].id]);return `<div class="stack-lg">${back}<div class="empty stack"><p style="color:var(--ink)">${esc(t.msg)}</p><div><button class="btn" data-act="libDocRetry" data-id="${esc(R.errs[0].id)}">Try again</button></div></div></div>`;}
+  if(R.busy&&!R.list[v.i]) return `<div class="stack-lg">${back}<div class="empty">Opening lesson…</div></div>`;
+  const L=R.list; const i=Math.max(0,Math.min(v.i,L.length-1)); const u=L[i];
+  if(!u) return `<div class="stack-lg">${back}<div class="empty">This document has no readable pages.</div></div>`;
+  const md=mediaOf(u); const on=!!LIB.done[u.key]; const src=safeUrl(u.src);
+  const prev=L[i-1],next=L[i+1];
+  return `<article class="stack-lg lessonpage">
+    ${back}
+    <header class="stack" style="gap:8px">
+      <p class="eyebrow">${esc(u.section||curTitle())} · ${v.src==="doc"?"Page":"Lesson"} ${i+1} of ${L.length}</p>
+      <h1>${esc(u.title)}</h1>
+      <div class="row">
+        ${md.rec.map((r,k)=>`<a class="btn" href="${esc(r)}" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>${md.rec.length>1?"Video "+(k+1):"Watch recording"}</a>`).join("")}
+        ${md.slides.slice(0,2).map((s,k)=>`<a class="btn quiet" href="${esc(s)}" target="_blank" rel="noopener">Slide deck${md.slides.length>1?" "+(k+1):""}</a>`).join("")}
+        ${src?`<a class="btn ghost sm" href="${esc(src)}" target="_blank" rel="noopener">Original HelloPM page</a>`:""}
+      </div>
+    </header>
+    <div class="md">${mdHtml(u)}</div>
+    <div class="card stack">
+      <button class="btn ${on?"quiet":""}" data-act="libDoneLesson" data-key="${esc(u.key)}" aria-pressed="${on}">${on?"✓ Completed · undo":"Mark as complete"}</button>
+      <div class="spread">
+        ${prev?`<button class="btn sm ghost" data-act="libLesson" data-src="${esc(v.src)}" data-key="${esc(v.key)}" data-i="${i-1}">← Previous</button>`:"<span></span>"}
+        ${next?`<button class="btn sm" data-act="libLesson" data-src="${esc(v.src)}" data-key="${esc(v.key)}" data-i="${i+1}">Next: ${esc(next.title.length>34?next.title.slice(0,32)+"…":next.title)} →</button>`:`<button class="btn sm ghost" data-act="libBack">Back to ${esc(curTitle())}</button>`}
+      </div>
+    </div>
+  </article>`;
+}
 function renderLibrary(){
   if(!LIB.rootId) return `<div class="empty">Library isn't set up yet.</div>`;
   if(!LIB.ready) return `<div class="empty">Connecting to Google Drive…</div>`;
   if(!LIB.mcp) return `<div class="empty stack"><h2 style="color:var(--ink)">Google Drive isn't available here</h2><p class="small">Open the portal in claude.ai while signed in, with Google Drive connected under Settings → Connectors.</p></div>`;
-  const id=curFolder(); const here=LIB.path.length?LIB.path[LIB.path.length-1].title:LIB.rootTitle;
-  const crumbs=[`<button data-act="libCrumb" data-i="-1">${esc(LIB.rootTitle)}</button>`].concat(LIB.path.map((p,i)=>i===LIB.path.length-1?`<span class="here">${esc(p.title)}</span>`:`<button data-act="libCrumb" data-i="${i}">${esc(p.title)}</button>`));
-  let head=`<div class="stack">
-    <p class="eyebrow">Private library · only you can see this</p>
-    <form class="search" id="libSearch" role="search"><input id="lib-q" name="q" type="search" placeholder="Search your Drive by title" value="${esc(LIB.q)}" aria-label="Search your Drive"><button class="btn" type="submit">Search</button></form>
-    ${LIB.results?"":`<nav class="crumbs" aria-label="Folder path">${LIB.path.length?crumbs.join('<span class="sep">/</span>'):`<span class="here">${esc(LIB.rootTitle)}</span>`}</nav>`}
-  </div>`;
+  if(LIB.view&&LIB.view.t==="read") return renderRead();
+  const id=curFolder(); const here=curTitle(); const head=libHead();
   if(LIB.err){const t=libErrText(LIB.err);return `<div class="stack-lg">${head}<div class="empty stack"><p style="color:var(--ink)">${esc(t.msg)}</p>${t.ask?`<div><button class="btn" data-act="libRetry">${LIB.err.code==="approval_required"||LIB.err.code==="not_in_manifest"?"Allow Drive access":"Try again"}</button></div>`:""}</div></div>`;}
   if(LIB.results){
     const rs=LIB.results.slice().sort(natural);
     return `<div class="stack-lg">${head}<div class="spread"><h2>${rs.length} result${rs.length===1?"":"s"} for “${esc(LIB.q)}”</h2><button class="btn sm ghost" data-act="libClear">Clear</button></div>
-      ${rs.length?`<ul class="weeks">${rs.filter(f=>kindOf(f)==="folder").map(folderRow).join("")}</ul><ul class="lessons">${rs.filter(f=>kindOf(f)!=="folder").map(f=>libItem(f)).join("")}</ul>`:`<div class="empty small">Nothing in your Drive matches that title.</div>`}</div>`;
+      ${rs.length?`<ul class="weeks">${rs.filter(f=>kindOf(f)==="folder").map(folderRow).join("")}</ul><ul class="lessons">${rs.filter(f=>kindOf(f)!=="folder").map(libFileItem).join("")}</ul>`:`<div class="empty small">Nothing in your Drive matches that title.</div>`}</div>`;
   }
   const files=LIB.cache[id];
   if(!files) return `<div class="stack-lg">${head}<div class="empty">Loading ${esc(here)}…</div></div>`;
-  const by={folder:[],lesson:[],quiz:[],video:[],file:[]};
-  files.slice().sort(natural).forEach(f=>{const k=kindOf(f);(by[k==="videolinks"?"video":k]||by.file).push(f);});
-  const nonFolder=files.filter(f=>kindOf(f)!=="folder"); const doneN=nonFolder.filter(f=>LIB.done[f.id]).length;
-  const sec=(title,list,hint)=>list.length?`<section class="stack"><div class="spread"><h2>${title}</h2><span class="small muted">${list.length}</span></div>${hint?`<p class="lib-hint">${hint}</p>`:""}<ul class="lessons">${list.map(f=>libItem(f)).join("")}</ul></section>`:"";
+  const by={folder:[],read:[],video:[],file:[]};
+  files.slice().sort(natural).forEach(f=>{const k=kindOf(f); if(k!=="lesson") (by[k]||by.file).push(f);});
+  const LS=lessonsIn(id); const L=LS.list;
+  const doneN=L.filter(u=>LIB.done[u.key]).length; const nextU=L.find(u=>!LIB.done[u.key]);
+  const sec=(title,list,hint)=>list.length?`<section class="stack"><div class="spread"><h2>${title}</h2><span class="small muted">${list.length}</span></div>${hint?`<p class="lib-hint">${hint}</p>`:""}<ul class="lessons">${list.map(libFileItem).join("")}</ul></section>`:"";
   return `<div class="stack-lg">${head}
     <div class="spread"><h1>${esc(here)}</h1><button class="btn sm ghost" data-act="libRefresh">${LIB.loading===id?"Refreshing…":"Refresh"}</button></div>
-    ${nonFolder.length?`<div class="stack" style="gap:6px"><div class="bar"><i style="width:${Math.round(doneN/nonFolder.length*100)}%"></i></div><p class="small muted">${doneN} of ${nonFolder.length} items in this folder done</p></div>`:""}
-    ${by.folder.length?`<section class="stack"><h2>${LIB.path.length?"Sections":"Courses"}</h2><ul class="weeks">${by.folder.map(folderRow).join("")}</ul></section>`:""}
-    ${sec("Lessons",by.lesson,"Full lesson text, session summaries, resources and assignment briefs.")}
-    ${sec("Quizzes",by.quiz)}
-    ${sec("Recordings",by.video,"Videos open in Google Drive's player.")}
+    ${L.length?`<div class="stack" style="gap:6px"><div class="bar"><i style="width:${Math.round(doneN/L.length*100)}%"></i></div><p class="small muted">${doneN} of ${L.length} lessons complete</p></div>`:""}
+    ${nextU?`<section class="card next stack"><p class="eyebrow">${doneN?"Continue":"Start here"}</p><h2>${esc(nextU.title)}</h2><div><button class="btn" data-act="libLesson" data-src="folder" data-key="${esc(id)}" data-i="${L.indexOf(nextU)}">${doneN?"Continue lesson":"Start lesson"}</button></div></section>`:""}
+    ${by.folder.length?`<section class="stack"><h2>${LIB.path.length?"Modules":"Courses"}</h2><ul class="weeks">${by.folder.map(folderRow).join("")}</ul></section>`:""}
+    ${L.length?`<section class="stack"><h2>Lessons</h2>${lessonRows(L,id)}</section>`:""}
+    ${LS.busy?`<div class="empty small">Loading lessons…</div>`:""}
+    ${LS.errs.map(d=>{const t=libErrText(LIB.docErr[d.id]);return `<div class="empty stack small"><p style="color:var(--ink)">${esc(d.title)}: ${esc(t.msg)}</p><div><button class="btn sm" data-act="libDocRetry" data-id="${esc(d.id)}">Try again</button></div></div>`;}).join("")}
+    ${sec("Quizzes, notes and readings",by.read,"Tap Read here to open them as pages inside the portal.")}
+    ${sec("Recordings",by.video,"Videos play in Google Drive's player.")}
     ${sec("Course files",by.file)}
     ${files.length?"":`<div class="empty small">This folder is empty in your Drive so far.</div>`}
   </div>`;
@@ -461,6 +681,7 @@ function render(){
   const keepScroll=window.scrollY;
   const f=document.activeElement&&document.activeElement.id;
   $view.innerHTML=({home:renderHome,course:renderCourse,live:renderLive,community:renderCommunity,me:renderMe,library:renderLibrary}[S.tab]||renderHome)();
+  if(S.tab==="library") fixLinks();
   if(f){const el=document.getElementById(f); if(el&&el.focus) el.focus();}
   window.scrollTo(0,keepScroll);
 }
@@ -485,12 +706,17 @@ $view.addEventListener("click",async e=>{
   else if(a==="delCancel"){S.confirmDel=null;render();}
   else if(a==="delLessonYes"){S.confirmDel=null;try{await S.db.doc("lessons/"+id).delete();toast("Lesson deleted");}catch(err){toast("Couldn't delete that lesson. Try again.");}}
   else if(a==="libOpen") openFolder(id,el.dataset.title);
-  else if(a==="libCrumb"){const i=+el.dataset.i;LIB.path=LIB.path.slice(0,i+1);LIB.err=null;loadFolder(curFolder());render();}
+  else if(a==="libCrumb"){const i=+el.dataset.i;LIB.path=LIB.path.slice(0,i+1);LIB.view=null;LIB.err=null;LIB.results=null;loadFolder(curFolder());render();window.scrollTo(0,0);}
   else if(a==="libRefresh") loadFolder(curFolder(),true);
   else if(a==="libRetry"){LIB.err=null;if(LIB.q&&!LIB.results)runSearch(LIB.q);else loadFolder(curFolder(),true);}
   else if(a==="libClear"){LIB.results=null;LIB.q="";render();}
   else if(a==="libToggle"){if(LIB.done[id])delete LIB.done[id];else LIB.done[id]=true;render();saveProgress();}
-  else if(a==="libContinue"&&LIB.last){LIB.path=(LIB.last.path||[{id:LIB.last.id,title:LIB.last.title}]).slice();setTab("library");}
+  else if(a==="libLesson") openRead(el.dataset.src,el.dataset.key,el.dataset.i);
+  else if(a==="libReadDoc") openRead("doc",id,0);
+  else if(a==="libBack"){LIB.view=null;render();window.scrollTo(0,0);}
+  else if(a==="libDoneLesson"){const k=el.dataset.key;if(LIB.done[k])delete LIB.done[k];else LIB.done[k]=true;render();saveProgress();}
+  else if(a==="libDocRetry"){delete LIB.docErr[id];delete LIB.docs[id];loadDoc(id);}
+  else if(a==="libContinue"&&LIB.last){LIB.path=(LIB.last.path||[]).slice();LIB.view=LIB.last.view||null;LIB.results=null;setTab("library");}
   else if(a==="resetAsk"){S.confirmDel="__reset";render();}
   else if(a==="resetYes"){S.confirmDel=null;S.done={};render();saveProgress();toast("Progress cleared");}
 });
@@ -536,7 +762,7 @@ render();
   if(S.uid) db.doc("data/users/"+S.uid+"/progress").onSnapshot(s=>{
     if(s.metadata.hasPendingWrites) return;
     const d=s.exists?s.data():{};
-    S.done=Object.assign({},d.done||{}); LIB.done=Object.assign({},d.libDone||{}); LIB.last=d.libLast||null; render();},onErr);
+    S.done=Object.assign({},d.done||{}); LIB.done=Object.assign({},d.libDone||{}); LIB.last=d.libLast&&d.libLast.path?d.libLast:null; render();},onErr);
   if(S.canEdit){
     db.doc("private/library").onSnapshot(s=>{
       const d=s.exists?s.data():null;
