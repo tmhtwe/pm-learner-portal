@@ -28,7 +28,7 @@ Add an entry to `lessons` in `data/course.json`:
 ## Not in this repo
 
 - **Learner data.** Progress and any personal details are never committed.
-- **The HelloPM archive.** It stays private in Google Drive (HelloPM › Website). The portal's Library tab reads it live, and only Tin can see it.
+- **The HelloPM archive.** It lives in the private repo `tmhtwe/hellopm-archive` (lesson viewer, documents and index) and in Google Drive. It is never published here.
 - **Videos.** These stay in Google Drive (and later Bunny Stream or Mux), because GitHub rejects files over 100 MB.
 
 ## Course shape
