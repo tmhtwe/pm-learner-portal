@@ -6,12 +6,24 @@ Tin's learner portal for a weekend product management cohort, the way HelloPM wo
 
 | Path | What it is |
 |---|---|
-| `portal/index.html` | The portal page (mobile-first, no build step). Published privately on claude.ai. |
+| `index.html` | **The portal website** (mobile-first, no build step). Served by GitHub Pages. |
+| `data/course.json` | **All course content** the website shows: settings, weeks 0–16 and lessons. Edit this to add lessons. |
+| `portal/index.html` | The claude.ai version of the portal (with edit mode and the private HelloPM library). |
 | `data/weeks/` | Weeks 0–16 of the course outline |
 | `data/lessons/` | Lessons (title, type, minutes, link, note, week) |
 | `data/settings/` | Course name, start date, class time, live class, recordings and Telegram links |
 
-The live data is in the claude.ai artifact's database. The files in `data/` are exports of it.
+`data/weeks/`, `data/lessons/` and `data/settings/` are exports from the claude.ai version. The website reads only `data/course.json`.
+
+## Adding a lesson
+
+Add an entry to `lessons` in `data/course.json`:
+
+```json
+{ "id": "w01-intro", "week": 1, "order": 1, "title": "What a PM does", "kind": "watch", "mins": 12, "url": "https://youtube.com/...", "note": "" }
+```
+
+`kind` is one of `watch`, `do`, `discuss`, `attend` or `read`. Progress ticks are saved in each visitor's browser.
 
 ## Not in this repo
 

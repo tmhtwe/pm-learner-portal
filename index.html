@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PM Learner Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Noto+Sans+Myanmar:wght@400;600&display=swap">
+<style>
+/* Layout: one mobile column (max 560px) with a fixed bottom tab bar, per the portal's 360px-first design rules */
+:root{
+  --ground:#F6F7F4; --surface:#FFFFFF; --ink:#17201B; --muted:#4A544E; --line:#DDE3DF;
+  --accent:#0F6E64; --accent-ink:#FFFFFF; --soft:#E4ECE8; --done:#2F7D4F; --warn:#9A5B00;
+  --font:"Figtree","Noto Sans Myanmar",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r-ctl:12px; --r-card:16px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --ground:#0F1513; --surface:#17201C; --ink:#E6ECE8; --muted:#A3B0A9; --line:#2A3530;
+  --accent:#4FB8A9; --accent-ink:#06201C; --soft:#1C2B27; --done:#6CC48E; --warn:#E0A84A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --ground:#0F1513; --surface:#17201C; --ink:#E6ECE8; --muted:#A3B0A9; --line:#2A3530;
+  --accent:#4FB8A9; --accent-ink:#06201C; --soft:#1C2B27; --done:#6CC48E; --warn:#E0A84A; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--ground);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{max-width:560px;margin:0 auto;padding-block:20px calc(96px + env(safe-area-inset-bottom,0px))}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
+h1{font-size:1.5rem;font-weight:700}
+h2{font-size:1.125rem;font-weight:700}
+h3{font-size:1rem;font-weight:600}
+p{margin:0}
+a{color:var(--accent)}
+.muted{color:var(--muted)}
+.small{font-size:.875rem}
+.eyebrow{font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.stack-lg{display:flex;flex-direction:column;gap:24px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.spread>*{min-width:0}
+
+header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:20px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--accent)}
+.badge.warn{color:var(--warn)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:16px}
+.next{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.next .eyebrow,.next .muted{color:inherit;opacity:.85}
+.next .btn{background:var(--accent-ink);color:var(--accent)}
+
+.btn{appearance:none;border:0;font:inherit;font-weight:600;font-size:.9375rem;min-height:44px;padding:10px 16px;border-radius:var(--r-ctl);
+  background:var(--accent);color:var(--accent-ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+.btn.quiet{background:var(--soft);color:var(--accent)}
+.btn.danger{background:transparent;color:var(--warn);border:1px solid var(--line)}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:.875rem}
+.btn:focus-visible,.tab:focus-visible,.check:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.weekrow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.bar{height:8px;border-radius:999px;background:var(--soft);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .3s}
+
+/* lesson list */
+.lessons{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);overflow:hidden}
+.lesson{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-top:1px solid var(--line)}
+.lesson:first-child{border-top:0}
+.lesson .body{flex:1;min-width:0}
+.lesson .title{font-weight:600;overflow-wrap:anywhere}
+.lesson.is-done .title{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.check{flex:none;width:28px;height:28px;margin:8px 0;border-radius:8px;border:2px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;padding:0;color:var(--accent-ink)}
+.check.on{background:var(--done);border-color:var(--done)}
+.check svg{width:16px;height:16px}
+.kind{font-size:.6875rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:6px;background:var(--soft);color:var(--accent)}
+.meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;font-size:.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* week list */
+.weeks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.phase{margin-top:12px}
+.weekrow{width:100%;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;min-height:56px}
+.weekrow.current{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.wnum{flex:none;width:40px;height:40px;border-radius:12px;background:var(--soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-variant-numeric:tabular-nums}
+.weekrow.complete .wnum{background:var(--done);color:var(--accent-ink)}
+.weekrow .body{flex:1;min-width:0}
+.chev{flex:none;color:var(--muted)}
+
+/* forms */
+form.stack label{display:flex;flex-direction:column;gap:4px;font-size:.875rem;font-weight:600}
+input,select,textarea{font:inherit;font-size:1rem;font-weight:400;color:var(--ink);background:var(--ground);border:1px solid var(--line);border-radius:var(--r-ctl);padding:10px 12px;min-height:44px;width:100%}
+textarea{min-height:80px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:380px){.grid2{grid-template-columns:1fr}}
+
+.empty{border:1px dashed var(--line);border-radius:var(--r-card);padding:20px;text-align:center;color:var(--muted)}
+.notice{border-radius:var(--r-ctl);padding:10px 14px;background:var(--soft);font-size:.875rem}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--ground);padding:10px 16px;border-radius:999px;font-size:.875rem;font-weight:600;z-index:30}
+
+/* tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:20;
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+nav.tabs .inner{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tab{appearance:none;background:none;border:0;font:inherit;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 10px;min-height:56px;cursor:pointer;font-size:.75rem;font-weight:600}
+.tab svg{width:22px;height:22px}
+.tab[aria-current="page"]{color:var(--accent)}
+nav.tabs.owner .inner{grid-template-columns:repeat(6,1fr)}
+nav.tabs.owner .tab{font-size:.6875rem}
+
+/* library */
+.crumbs{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:.875rem}
+.crumbs button{appearance:none;background:none;border:0;font:inherit;color:var(--accent);cursor:pointer;padding:6px 4px;min-height:36px;font-weight:600}
+.crumbs span.sep{color:var(--muted)}
+.crumbs .here{color:var(--ink);font-weight:600;padding:6px 4px}
+.search{display:flex;gap:8px}
+.search input{flex:1;min-width:0}
+.ftype{font-size:.6875rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:6px;border:1px solid var(--line);color:var(--muted)}
+.lib-hint{font-size:.8125rem;color:var(--muted)}
+.lessonpage h1{font-size:1.625rem}
+.md{max-width:68ch;font-size:1rem;line-height:1.65;overflow-wrap:anywhere;min-width:0}
+.md>*+*{margin-top:12px}
+.md p{margin:0}
+.md h1,.md h2{font-size:1.25rem;margin-top:24px}
+.md h3{font-size:1.125rem;margin-top:24px}
+.md h4,.md h5{font-size:1rem;margin-top:20px}
+.md ul,.md ol{margin:0;padding-left:1.4em}
+.md li+li{margin-top:4px}
+.md a{color:var(--accent);text-underline-offset:2px}
+.md img{max-width:100%;height:auto;border-radius:8px}
+.md hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+.md blockquote{margin:0;padding:8px 14px;border-left:3px solid var(--line);color:var(--muted)}
+.md table{display:block;overflow-x:auto;border-collapse:collapse;font-size:.875rem}
+.md th,.md td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+.md code{font-size:.875em;background:var(--soft);padding:1px 5px;border-radius:5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="top">
+    <div>
+      <p class="eyebrow" id="courseEyebrow">Product management cohort</p>
+      <h1 id="courseName">PM Course</h1>
+    </div>
+    <span class="badge" id="modeBadge">Loading…</span>
+  </header>
+  <main id="view" aria-live="polite">
+    <div class="empty">Loading your course…</div>
+  </main>
+</div>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="inner">
+    <button class="tab" data-tab="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+    <button class="tab" data-tab="course"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h16M4 19h10"/></svg>Course</button>
+    <button class="tab" data-tab="live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg>Live</button>
+    <button class="tab" data-tab="community"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Community</button>
+    <button class="tab" data-tab="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Me</button>
+  </div>
+</nav>
+
+<script>
+(function(){
+const KINDS={watch:"Watch",do:"Do",discuss:"Discuss",attend:"Attend",read:"Read"};
+const S={tab:"home",openWeek:null,weeks:[],lessons:[],settings:{},done:{},
+  db:null,user:null,uid:null,canEdit:false,edit:false,loaded:{weeks:false,lessons:false},
+  editingLesson:null,confirmDel:null,status:"loading"};
+const $view=document.getElementById("view");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl=u=>{try{const x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:"";}catch(e){return "";}};
+const tick='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
+const chev='<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>';
+
+function toast(msg){const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+
+/* ---------- derived ---------- */
+function sortedLessons(){return S.lessons.slice().sort((a,b)=>(a.week-b.week)||((a.order??0)-(b.order??0))||String(a.title).localeCompare(b.title));}
+function lessonsFor(w){return sortedLessons().filter(l=>l.week===w);}
+function weekStats(w){const ls=lessonsFor(w);const d=ls.filter(l=>S.done[l.id]).length;return {total:ls.length,done:d};}
+function calendarWeek(){
+  const s=S.settings.startDate; if(!s) return null;
+  const start=new Date(s+"T00:00:00"); if(isNaN(start)) return null;
+  const diff=Math.floor((Date.now()-start.getTime())/(7*864e5));
+  return diff<0?-1:Math.min(diff,16);
+}
+function nextUp(){
+  const all=sortedLessons().filter(l=>!S.done[l.id]);
+  const cw=calendarWeek();
+  if(cw!=null&&cw>=0){const due=all.find(l=>l.week<=cw); if(due) return due;}
+  return all[0]||null;
+}
+function currentWeek(){const cw=calendarWeek(); if(cw!=null&&cw>=0) return cw; const n=nextUp(); return n?n.week:0;}
+function weekTitle(n){const w=S.weeks.find(x=>x.n===n);return w?w.title:("Week "+n);}
+function weekObj(n){return S.weeks.find(x=>x.n===n);}
+
+/* ---------- progress writes (one at a time) ---------- */
+let writeChain=Promise.resolve();
+function saveProgress(){
+  try{localStorage.setItem("pmportal.progress",JSON.stringify({done:S.done,updatedAt:new Date().toISOString()}));}catch(e){}
+}
+function toggleDone(id){
+  if(S.done[id]) delete S.done[id]; else S.done[id]=true;
+  render(); saveProgress();
+}
+
+const LIB={rootId:null,done:{},last:null};
+function renderLibrary(){return "";}
+function loadFolder(){}
+function curFolder(){return null;}
+function fixLinks(){}
+
+/* ---------- render ---------- */
+function lessonItem(l,opts={}){
+  const on=!!S.done[l.id]; const url=safeUrl(l.url);
+  const editing=S.edit&&S.canEdit;
+  return `<li class="lesson ${on?"is-done":""}">
+    <button class="check ${on?"on":""}" data-act="toggle" data-id="${esc(l.id)}" aria-pressed="${on}" aria-label="${on?"Mark not done":"Mark done"}: ${esc(l.title)}">${on?tick:""}</button>
+    <div class="body">
+      <div class="title">${esc(l.title)}</div>
+      <div class="meta"><span class="kind">${esc(KINDS[l.kind]||l.kind||"Lesson")}</span>${l.mins?`<span>${esc(l.mins)} min</span>`:""}${opts.showWeek?`<span>Week ${l.week}</span>`:""}</div>
+      ${l.note?`<p class="small muted" style="margin-top:6px">${esc(l.note)}</p>`:""}
+      <div class="row" style="margin-top:8px">
+        ${url?`<a class="btn sm quiet" href="${esc(url)}" target="_blank" rel="noopener">Open</a>`:""}
+        ${editing?`<button class="btn sm ghost" data-act="editLesson" data-id="${esc(l.id)}">Edit</button>
+          ${S.confirmDel===l.id?`<button class="btn sm danger" data-act="delLessonYes" data-id="${esc(l.id)}">Confirm delete</button><button class="btn sm ghost" data-act="delCancel">Keep</button>`
+          :`<button class="btn sm danger" data-act="delLesson" data-id="${esc(l.id)}">Delete</button>`}`:""}
+      </div>
+    </div></li>`;
+}
+
+function renderHome(){
+  const total=S.lessons.length, done=S.lessons.filter(l=>S.done[l.id]).length;
+  const pct=total?Math.round(done/total*100):0;
+  const n=nextUp(); const cw=currentWeek(); const cal=calendarWeek();
+  const thisWeek=lessonsFor(cw);
+  const ws=weekStats(cw);
+  const live=S.settings;
+  let calNote="";
+  if(cal===-1) calNote=`<p class="small muted">The cohort hasn't started yet. Week 0 begins ${esc(fmtDate(S.settings.startDate))}.</p>`;
+  return `<div class="stack-lg">
+    ${n?`<section class="card next stack">
+      <p class="eyebrow">Next up · Week ${n.week}</p>
+      <h2>${esc(n.title)}</h2>
+      <p class="small muted">${esc(KINDS[n.kind]||"Lesson")}${n.mins?" · "+esc(n.mins)+" min":""}</p>
+      <div class="row">
+        ${safeUrl(n.url)?`<a class="btn" href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener">Start</a>`:""}
+        <button class="btn" data-act="toggle" data-id="${esc(n.id)}">Mark done</button>
+      </div></section>`
+    : total?`<section class="card stack"><p class="eyebrow">All caught up</p><h2>Every lesson is done</h2><p class="small muted">New lessons will show here when they're added.</p></section>`
+    : `<section class="empty stack"><h2 style="color:var(--ink)">No lessons yet</h2><p class="small">${S.canEdit?"Open Course, pick a week and add your first lesson.":"Lessons will appear here week by week."}</p>${S.canEdit?'<div><button class="btn" data-act="goWeek" data-week="0">Add lessons to Week 0</button></div>':""}</section>`}
+
+    <section class="stack">
+      <div class="spread"><h2>This week · Week ${cw}</h2><span class="small muted" style="font-variant-numeric:tabular-nums">${ws.done}/${ws.total}</span></div>
+      <p class="small muted">${esc(weekTitle(cw))}</p>
+      ${calNote}
+      ${thisWeek.length?`<ul class="lessons">${thisWeek.map(l=>lessonItem(l)).join("")}</ul>`:`<div class="empty small">Nothing scheduled for this week yet.</div>`}
+    </section>
+
+    <section class="card stack">
+      <div class="spread"><h3>Course progress</h3><span class="small muted" style="font-variant-numeric:tabular-nums">${done} of ${total} · ${pct}%</span></div>
+      <div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+    </section>
+
+    ${LIB.rootId?`<section class="card spread"><div><p class="eyebrow">Your HelloPM library</p><p style="font-weight:600">${LIB.last?"Continue: "+esc(LIB.last.title):"Browse your archived courses"}</p></div><button class="btn sm quiet" data-act="${LIB.last?"libContinue":"tab"}" data-tab="library">Open</button></section>`:""}
+
+    ${live.classTime?`<section class="card spread"><div><p class="eyebrow">Live class</p><p style="font-weight:600">${esc(live.classTime)}</p></div><button class="btn sm ghost" data-act="tab" data-tab="live">Details</button></section>`:""}
+  </div>`;
+}
+
+function phaseOf(n){return n===0?"Get started":n<=4?"Discovery and user research":n<=8?"Prioritisation, roadmaps and specs":n===9?"Catch-up":n<=13?"Metrics, experiments and engineering":"Portfolio and job search";}
+
+function renderCourse(){
+  if(S.openWeek!=null) return renderWeek(S.openWeek);
+  if(!S.weeks.length) return `<div class="empty">The course outline isn't set up yet.</div>`;
+  const cw=currentWeek(); let lastPhase=""; let out='<div class="stack"><p class="small muted">Weeks 0 to 16 · tap a week to see its lessons.</p><ul class="weeks">';
+  S.weeks.slice().sort((a,b)=>a.n-b.n).forEach(w=>{
+    const ph=w.phase||phaseOf(w.n);
+    if(ph!==lastPhase){out+=`<li class="phase eyebrow">${esc(ph)}</li>`;lastPhase=ph;}
+    const st=weekStats(w.n); const complete=st.total&&st.done===st.total;
+    out+=`<li><button class="weekrow ${w.n===cw?"current":""} ${complete?"complete":""}" data-act="goWeek" data-week="${w.n}">
+      <span class="wnum">${complete?tick:w.n}</span>
+      <span class="body"><span style="display:block;font-weight:600">${esc(w.title)}</span>
+      <span class="small muted">${st.total?`${st.done}/${st.total} done`:"No lessons yet"}${w.n===cw?" · current":""}</span></span>${chev}</button></li>`;
+  });
+  return out+"</ul></div>";
+}
+
+function lessonForm(week,l){
+  l=l||{}; const k=l.kind||"watch";
+  return `<form class="card stack" id="lessonForm" data-week="${week}" data-id="${esc(l.id||"")}">
+    <h3>${l.id?"Edit lesson":"Add a lesson"}</h3>
+    <label for="lf-title">Title<input id="lf-title" name="title" required maxlength="140" value="${esc(l.title||"")}" placeholder="e.g. What a PM actually does"></label>
+    <div class="grid2">
+      <label for="lf-kind">Type<select id="lf-kind" name="kind">${Object.entries(KINDS).map(([v,t])=>`<option value="${v}" ${v===k?"selected":""}>${t}</option>`).join("")}</select></label>
+      <label for="lf-mins">Minutes<input id="lf-mins" name="mins" type="number" min="0" max="600" inputmode="numeric" value="${esc(l.mins??"")}"></label>
+    </div>
+    <label for="lf-url">Link (YouTube, Drive, Docs…)<input id="lf-url" name="url" type="url" value="${esc(l.url||"")}" placeholder="https://"></label>
+    <label for="lf-note">Note<textarea id="lf-note" name="note" maxlength="600" placeholder="What to focus on, or the task brief">${esc(l.note||"")}</textarea></label>
+    <div class="row"><button class="btn" type="submit">${l.id?"Save changes":"Add lesson"}</button>${l.id?'<button class="btn ghost" type="button" data-act="cancelEdit">Cancel</button>':""}</div>
+  </form>`;
+}
+
+function renderWeek(n){
+  const w=weekObj(n)||{n,title:"Week "+n}; const ls=lessonsFor(n); const st=weekStats(n);
+  const editing=S.edit&&S.canEdit;
+  const editL=S.editingLesson?S.lessons.find(x=>x.id===S.editingLesson):null;
+  return `<div class="stack-lg">
+    <div class="stack">
+      <div><button class="btn sm ghost" data-act="backWeeks">← All weeks</button></div>
+      <p class="eyebrow">Week ${n} · ${esc(w.phase||phaseOf(n))}</p>
+      ${editing?`<form id="weekForm" data-week="${n}" class="row"><input id="wf-title" name="title" value="${esc(w.title)}" maxlength="120" aria-label="Week title" style="flex:1;min-width:0"><button class="btn sm" type="submit">Rename</button></form>`:`<h1>${esc(w.title)}</h1>`}
+      ${st.total?`<div class="bar"><i style="width:${Math.round(st.done/st.total*100)}%"></i></div><p class="small muted">${st.done} of ${st.total} done</p>`:""}
+    </div>
+    ${ls.length?`<ul class="lessons">${ls.map(l=>lessonItem(l)).join("")}</ul>`:`<div class="empty small">No lessons in this week yet.${S.canEdit&&!editing?' Turn on edit mode to add some.':""}</div>`}
+    ${S.canEdit&&!editing?`<div><button class="btn quiet" data-act="editOn">Edit this week</button></div>`:""}
+    ${editing?lessonForm(n,editL):""}
+    <div class="row">${n>0?`<button class="btn sm ghost" data-act="goWeek" data-week="${n-1}">← Week ${n-1}</button>`:""}${n<16?`<button class="btn sm ghost" data-act="goWeek" data-week="${n+1}">Week ${n+1} →</button>`:""}</div>
+  </div>`;
+}
+
+function fmtDate(s){if(!s) return "";const d=new Date(s+"T00:00:00");return isNaN(d)?s:d.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"});}
+
+function linkBtn(url,label){const u=safeUrl(url);return u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener">${esc(label)}</a>`:"";}
+
+function renderLive(){
+  const s=S.settings; const recs=sortedLessons().filter(l=>l.kind==="attend");
+  return `<div class="stack-lg">
+    <section class="card stack">
+      <p class="eyebrow">Saturday live class</p>
+      <h2>${esc(s.classTime||"Class time not set")}</h2>
+      <p class="small muted">90 minutes, every Saturday. Recordings and a catch-up plan go up within 24 hours.</p>
+      <div class="row">${linkBtn(s.liveUrl,"Join class")||`<span class="small muted">${S.canEdit?"Add the class link under Me → Course settings.":"The join link will appear here."}</span>`}${linkBtn(s.recordingsUrl,"All recordings").replace('class="btn"','class="btn ghost"')}</div>
+    </section>
+    <section class="stack"><h2>Sessions</h2>
+      ${recs.length?`<ul class="lessons">${recs.map(l=>lessonItem(l,{showWeek:true})).join("")}</ul>`:`<div class="empty small">Live sessions you add as "Attend" lessons will be listed here.</div>`}
+    </section></div>`;
+}
+
+function renderCommunity(){
+  const s=S.settings;
+  return `<div class="stack-lg"><section class="card stack">
+    <p class="eyebrow">Cohort group</p><h2>Telegram</h2>
+    <p class="small muted">Questions, assignment discussion and class reminders happen in the cohort's Telegram group. Use a nickname if you prefer, and keep it to course topics.</p>
+    <div class="row">${linkBtn(s.telegramUrl,"Open Telegram group")||`<span class="small muted">${S.canEdit?"Add the group link under Me → Course settings.":"The group link will appear here."}</span>`}</div>
+  </section></div>`;
+}
+
+function renderMe(){
+  const s=S.settings; const total=S.lessons.length, done=S.lessons.filter(l=>S.done[l.id]).length;
+  return `<div class="stack-lg">
+    <section class="card stack"><h3>Your progress</h3>
+      <p class="small muted" style="font-variant-numeric:tabular-nums">${done} of ${total} lessons done</p>
+      ${done?`<div><button class="btn sm ghost" data-act="resetAsk">Reset my progress</button></div>`:""}
+      ${S.confirmDel==="__reset"?`<div class="row"><span class="small">Clear every tick?</span><button class="btn sm danger" data-act="resetYes">Clear progress</button><button class="btn sm ghost" data-act="delCancel">Keep</button></div>`:""}
+    </section>
+    ${S.canEdit?`<section class="card stack">
+      <div class="spread"><h3>Edit mode</h3><button class="btn sm ${S.edit?"":"quiet"}" data-act="${S.edit?"editOff":"editOn"}">${S.edit?"Turn off":"Turn on"}</button></div>
+      <p class="small muted">Edit mode lets you add, change and delete lessons and rename weeks. Learners never see it.</p>
+    </section>
+    <form class="card stack" id="settingsForm"><h3>Course settings</h3>
+      <label for="sf-name">Course name<input id="sf-name" name="courseName" maxlength="80" value="${esc(s.courseName||"")}" placeholder="PM Course"></label>
+      <label for="sf-start">Week 0 starts (Saturday)<input id="sf-start" name="startDate" type="date" value="${esc(s.startDate||"")}"></label>
+      <label for="sf-time">Class time<input id="sf-time" name="classTime" maxlength="140" value="${esc(s.classTime||"")}"></label>
+      <label for="sf-live">Live class link<input id="sf-live" name="liveUrl" type="url" value="${esc(s.liveUrl||"")}" placeholder="https://"></label>
+      <label for="sf-rec">Recordings folder<input id="sf-rec" name="recordingsUrl" type="url" value="${esc(s.recordingsUrl||"")}" placeholder="https://"></label>
+      <label for="sf-tg">Telegram group<input id="sf-tg" name="telegramUrl" type="url" value="${esc(s.telegramUrl||"")}" placeholder="https://t.me/…"></label>
+      <div><button class="btn" type="submit">Save settings</button></div>
+    </form>`:""}
+    <p class="small muted">Your ticks are saved in this browser only. Burmese language and low-data mode come next.</p>
+  </div>`;
+}
+
+function render(){
+  document.getElementById("courseName").textContent=S.settings.courseName||"PM Course";
+  const b=document.getElementById("modeBadge");
+  if(S.status==="nodb"){b.textContent="Offline view";b.className="badge warn";}
+  else if(S.canEdit){b.textContent=S.edit?"Edit mode":"Owner";b.className="badge"+(S.edit?" warn":"");}
+  else {b.textContent="Weekend cohort";b.className="badge";}
+  document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-current",t.dataset.tab===S.tab?"page":"false"));
+  if(S.status==="nodb"){$view.innerHTML=`<div class="empty stack"><h2 style="color:var(--ink)">Can't load the course</h2><p class="small">The course file didn't load. Check your connection and reload the page.</p></div>`;return;}
+  if(!S.loaded.weeks||!S.loaded.lessons){$view.innerHTML='<div class="empty">Loading your course…</div>';return;}
+  const keepScroll=window.scrollY;
+  const f=document.activeElement&&document.activeElement.id;
+  $view.innerHTML=({home:renderHome,course:renderCourse,live:renderLive,community:renderCommunity,me:renderMe,library:renderLibrary}[S.tab]||renderHome)();
+  if(S.tab==="library") fixLinks();
+  if(f){const el=document.getElementById(f); if(el&&el.focus) el.focus();}
+  window.scrollTo(0,keepScroll);
+}
+
+function setTab(t){S.tab=t;S.confirmDel=null;if(t!=="course"){S.openWeek=null;}if(t==="library")loadFolder(curFolder());try{history.replaceState(null,"","#"+t);}catch(e){}render();window.scrollTo(0,0);}
+
+/* ---------- events ---------- */
+document.querySelector("nav.tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(b){if(b.dataset.tab==="course")S.openWeek=null;setTab(b.dataset.tab);}});
+$view.addEventListener("click",async e=>{
+  const el=e.target.closest("[data-act]"); if(!el) return;
+  const a=el.dataset.act, id=el.dataset.id;
+  if(a==="toggle") toggleDone(id);
+  else if(a==="goWeek"){S.tab="course";S.openWeek=+el.dataset.week;S.editingLesson=null;S.confirmDel=null;try{history.replaceState(null,"","#course");}catch(_){}
+    render();window.scrollTo(0,0);}
+  else if(a==="backWeeks"){S.openWeek=null;S.editingLesson=null;render();window.scrollTo(0,0);}
+  else if(a==="tab") setTab(el.dataset.tab);
+  else if(a==="editOn"){S.edit=true;render();}
+  else if(a==="editOff"){S.edit=false;S.editingLesson=null;render();}
+  else if(a==="editLesson"){S.editingLesson=id;render();const f=document.getElementById("lessonForm");if(f)f.scrollIntoView({block:"center"});}
+  else if(a==="cancelEdit"){S.editingLesson=null;render();}
+  else if(a==="delLesson"){S.confirmDel=id;render();}
+  else if(a==="delCancel"){S.confirmDel=null;render();}
+  else if(a==="delLessonYes"){S.confirmDel=null;try{await S.db.doc("lessons/"+id).delete();toast("Lesson deleted");}catch(err){toast("Couldn't delete that lesson. Try again.");}}
+  else if(a==="resetAsk"){S.confirmDel="__reset";render();}
+  else if(a==="resetYes"){S.confirmDel=null;S.done={};render();saveProgress();toast("Progress cleared");}
+});
+$view.addEventListener("submit",async e=>{
+  e.preventDefault(); const f=e.target; const fd=new FormData(f);
+  if(!S.db) return;
+  try{
+    if(f.id==="lessonForm"){
+      const week=+f.dataset.week, id=f.dataset.id;
+      const title=String(fd.get("title")||"").trim(); if(!title) return;
+      const url=String(fd.get("url")||"").trim();
+      if(url&&!safeUrl(url)){toast("Links need to start with https://");return;}
+      const body={week,title,kind:fd.get("kind"),url,note:String(fd.get("note")||"").trim(),
+        mins:fd.get("mins")?Number(fd.get("mins")):null};
+      if(id){const old=S.lessons.find(x=>x.id===id)||{};body.order=old.order??Date.now();await S.db.doc("lessons/"+id).set(body);S.editingLesson=null;toast("Lesson saved");}
+      else{body.order=Date.now();await S.db.collection("lessons").add(body);f.reset();toast("Lesson added");}
+    } else if(f.id==="weekForm"){
+      const n=+f.dataset.week; const w=weekObj(n)||{n};
+      const title=String(fd.get("title")||"").trim(); if(!title) return;
+      await S.db.doc("weeks/w"+String(n).padStart(2,"0")).set(Object.assign({},w,{title}));toast("Week renamed");
+    } else if(f.id==="settingsForm"){
+      const body={}; for(const k of ["courseName","startDate","classTime","liveUrl","recordingsUrl","telegramUrl"]) body[k]=String(fd.get(k)||"").trim();
+      for(const k of ["liveUrl","recordingsUrl","telegramUrl"]) if(body[k]&&!safeUrl(body[k])){toast("Links need to start with https://");return;}
+      await S.db.doc("settings/main").set(body);toast("Settings saved");
+    }
+  }catch(err){toast(err&&err.code==="invalid_argument"?"You don't have permission to change course content.":"Couldn't save. Check your connection and try again.");}
+});
+
+/* ---------- boot ---------- */
+const h=(location.hash||"").slice(1); if(["home","course","live","community","me","library"].includes(h)) S.tab=h;
+render();
+(async function boot(){
+  try{const p=JSON.parse(localStorage.getItem("pmportal.progress")||"{}");S.done=p.done||{};}catch(e){}
+  try{
+    const r=await fetch("data/course.json",{cache:"no-cache"}); if(!r.ok) throw new Error(r.status);
+    const d=await r.json();
+    S.weeks=d.weeks||[]; S.lessons=d.lessons||[]; S.settings=d.settings||{};
+    S.loaded.weeks=S.loaded.lessons=true; S.status="ok";
+  }catch(e){S.status="nodb";}
+  render();
+})();
+})();
+</script>
+
+</body>
+</html>

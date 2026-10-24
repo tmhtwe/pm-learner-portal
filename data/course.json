@@ -1,0 +1,129 @@
+{
+  "settings": {
+    "classTime": "Saturdays 9:30am Yangon · 10:00am Bangkok · 4:00pm Auckland",
+    "courseName": "PM Course",
+    "liveUrl": "",
+    "recordingsUrl": "",
+    "startDate": "",
+    "telegramUrl": ""
+  },
+  "weeks": [
+    {
+      "n": 0,
+      "phase": "Get started",
+      "title": "Onboarding, tools and meet the cohort"
+    },
+    {
+      "n": 1,
+      "phase": "Discovery and user research",
+      "title": "Discovery and user research (1 of 4)"
+    },
+    {
+      "n": 2,
+      "phase": "Discovery and user research",
+      "title": "Discovery and user research (2 of 4)"
+    },
+    {
+      "n": 3,
+      "phase": "Discovery and user research",
+      "title": "Discovery and user research (3 of 4)"
+    },
+    {
+      "n": 4,
+      "phase": "Discovery and user research",
+      "title": "Discovery and user research (4 of 4)"
+    },
+    {
+      "n": 5,
+      "phase": "Prioritisation, roadmaps and specs",
+      "title": "Prioritisation, roadmaps and specs (1 of 4)"
+    },
+    {
+      "n": 6,
+      "phase": "Prioritisation, roadmaps and specs",
+      "title": "Prioritisation, roadmaps and specs (2 of 4)"
+    },
+    {
+      "n": 7,
+      "phase": "Prioritisation, roadmaps and specs",
+      "title": "Prioritisation, roadmaps and specs (3 of 4)"
+    },
+    {
+      "n": 8,
+      "phase": "Prioritisation, roadmaps and specs",
+      "title": "Prioritisation, roadmaps and specs (4 of 4)"
+    },
+    {
+      "n": 9,
+      "phase": "Catch-up",
+      "title": "Catch-up week"
+    },
+    {
+      "n": 10,
+      "phase": "Metrics, experiments and engineering",
+      "title": "Metrics, experiments and engineering (1 of 4)"
+    },
+    {
+      "n": 11,
+      "phase": "Metrics, experiments and engineering",
+      "title": "Metrics, experiments and engineering (2 of 4)"
+    },
+    {
+      "n": 12,
+      "phase": "Metrics, experiments and engineering",
+      "title": "Metrics, experiments and engineering (3 of 4)"
+    },
+    {
+      "n": 13,
+      "phase": "Metrics, experiments and engineering",
+      "title": "Metrics, experiments and engineering (4 of 4)"
+    },
+    {
+      "n": 14,
+      "phase": "Portfolio and job search",
+      "title": "Portfolio project, CV and mock interviews (1 of 3)"
+    },
+    {
+      "n": 15,
+      "phase": "Portfolio and job search",
+      "title": "Portfolio project, CV and mock interviews (2 of 3)"
+    },
+    {
+      "n": 16,
+      "phase": "Portfolio and job search",
+      "title": "Portfolio project, CV and mock interviews (3 of 3)"
+    }
+  ],
+  "lessons": [
+    {
+      "kind": "watch",
+      "mins": 10,
+      "note": "Example lesson. Replace it with your own in data/course.json.",
+      "order": 1,
+      "title": "Welcome and how the course works (example)",
+      "url": "",
+      "week": 0,
+      "id": "ex1"
+    },
+    {
+      "kind": "do",
+      "mins": 15,
+      "note": "Example lesson. Replace it with your own in data/course.json.",
+      "order": 2,
+      "title": "Set up Telegram and your tools (example)",
+      "url": "",
+      "week": 0,
+      "id": "ex2"
+    },
+    {
+      "kind": "attend",
+      "mins": 90,
+      "note": "Example lesson. Replace it with your own in data/course.json.",
+      "order": 3,
+      "title": "Kickoff live class (example)",
+      "url": "",
+      "week": 0,
+      "id": "ex3"
+    }
+  ]
+}
